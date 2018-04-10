@@ -21,7 +21,7 @@ try {
 	config = require('./config.json')
 } catch (e) {
 	if(e.code === 'MODULE_NOT_FOUND')
-		fs.writeFile('./config.json', JSON.stringify(allowed), handle());
+		fs.writeFile('./config.json', JSON.stringify(config), handle());
 }
 // default allowed list
 let allowed = {'127.0.0.1': {'status': 0, 'password': 'nitro'}};
@@ -31,6 +31,15 @@ try {
 } catch (e) {
 	if(e.code === 'MODULE_NOT_FOUND')
 		fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
+}
+
+let passwords = {};
+
+try {
+	passwords = require('./passwords.json')
+} catch (e) {
+	if(e.code === 'MODULE_NOT_FOUND')
+		fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
 }
 
 function handle(err) {
@@ -60,7 +69,7 @@ app.use(Raven.requestHandler());
 
 app.ws('/ws', function(ws, req) {
 	ws.on('message', function(msg) {
-		if(msg === 'coolbeans') {
+		if(passwords[msg]) {
 			ws.send(`
 			(() => {
 				const x = new XMLHttpRequest
@@ -77,6 +86,8 @@ app.ws('/ws', function(ws, req) {
 			    };
 })()
 			`);
+			passwords[msg] = false;
+			fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
 		} else 
 			ws.send('console.log("miss")');
 	});

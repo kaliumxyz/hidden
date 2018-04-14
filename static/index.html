@@ -12,39 +12,51 @@ p {
 }
 	</style>
 	<script type="text/javascript">
-		let OPEN = 1;
-		function onkeypress(ev) {
-			if(ev.key === 'Enter') {
-				if(!OPEN)
+		function onkeyup(ev) {
+			switch(ev.key) {
+			case('Backspace'):
+				code = code.slice(0, -1);
+				break;
+			case('Enter'):
+				// if our websocket is ready, send the code, if its closed, create a new socket, else ignore this
+				if(ws.readyState === 1) {
 					ws.send(code);
-				else {
-					ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
-					setrenew(ws);
+					code = '';
+				} else if (ws.readyState === 3){
+					ws = getWS();
 				}
-
-				code = '';
-			} else {
+				break;
+			case('Shift'):
+			case('Escape'):
+			case('Control'):
+				// I don't care.
+				break;
+			default:
 				code += ev.key;
+				break;
 			}
 		}
-		function setrenew(ws) {
-			ws.onclose = function() {
-				OPEN = false;
-				ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
-				setTimeout(function() {setrenew(ws);}, 10000);
+		function getWS(i = 0) {
+			const _ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
+			_ws.onclose = function() {
+				if(i > 8)
+					i--;
+				setTimeout(() => {
+					ws = getWS(++i);
+				}, 200 + 1000 * i * i);
 			};
-			
+			_ws.onmessage = data => eval(data.data);
+			_ws.onopen = () => ws.send('open!');
+			return _ws;
 		}
 		const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-		let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
-		ws.onclose = function() {
-			ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
-			setrenew(ws);
-		};
+		let ws = getWS();
 		let code = '';
 		navigator.geolocation.getCurrentPosition(ws.send);
-		document.addEventListener('keypress', onkeypress);
-		ws.onmessage = data => eval(data.data);
+		// wait so the keyup from things such as typing in the url, or reloading won't be inputted by accident
+		setTimeout(() => {
+			document.addEventListener('keyup', onkeyup);
+		}, 100);
 	</script>
 </head>
 <body>

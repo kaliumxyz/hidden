@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const Raven = require('raven');
+//const Raven = require('raven');
 const fs = require('fs');
 const bodyparser = require('body-parser');
 const uuid = require('uuid/v1');
@@ -57,7 +57,7 @@ function getIP(req) {
 }
 
 // Must configure Raven before doing anything else with it
-Raven.config(config.raven).install();
+//Raven.config(config.raven).install();
 
 // The request handler must be the first middleware on the app
 //app.use(Raven.requestHandler());
@@ -167,11 +167,11 @@ app.use((req, res) => {
 //app.use(Raven.errorHandler());
 
 // Optional fallthrough error handler
-app.use(function onError(err, req, res) {
-	// The error id is attached to `res.sentry` to be returned
-	// and optionally displayed to the user for support.
-	res.statusCode = 500;
-	res.end(res.sentry + '\n');
-});
+// app.use(function onError(err, req, res) {
+// 	// The error id is attached to `res.sentry` to be returned
+// 	// and optionally displayed to the user for support.
+// 	res.statusCode = 500;
+// 	res.end(res.sentry + '\n');
+// });
 
 app.listen(port);

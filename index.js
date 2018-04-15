@@ -65,7 +65,7 @@ app.enable('trust proxy');
 // ws was monkypatched to the app object, see the dependencies
 app.ws('/ws', function(ws, req) {
 	const ip = getIP(req);
-	// send keystrokes instead if efficient
+	// TODO: send keystrokes instead if efficient
 	console.log(req.headers['sec-websocket-key'], ip);
 	ws.on('message', function(msg) {
 		console.log(msg);
@@ -102,10 +102,11 @@ app.use('/list', bodyparser.text(), (req, res) => {
 		allowed[ip] = {};
 		allowed[ip].status = 1;
 		fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
-		let post = posts.posts.map((post) => `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`);
+		let post = posts.posts.map((post) => `<h2> ${post.title} </h2>  <p> ${post.body} </p> <br>`);
 
 		res.send(`
-<h1> Hi ${req.ip}! </h1>
+<h1> Thanks for registering ${req.ip} :D! </h1>
+<hr>
 	
 ${post?post:'<p> currently I lack any posts, but thanks for registering :D </p>'}
 	
@@ -129,12 +130,17 @@ app.use('/blog/:num', (req, res) => {
 app.use('/blog', (req, res) => {
 	const ip = getIP(req);
 	if(allowed[ip]) {
-		let post = posts.posts.map((post) => `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`);
+		let content;
+		if(posts.posts)
+			content = posts.posts.reduce((res, post) => res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '');
+		else
+			content = '<p> currently I lack any posts ;-; </p>';
 
 		res.send(`
 <h1> Hi ${req.ip}! </h1>
+<hr>
 	
-${post?post:'<p> currently I lack any posts ;-; </p>'}
+${content}
 	
 	`); 
 	} else

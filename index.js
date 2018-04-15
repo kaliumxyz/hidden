@@ -102,10 +102,12 @@ app.use('/list', bodyparser.text(), (req, res) => {
 		allowed[ip] = {};
 		allowed[ip].status = 1;
 		fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
+		let post = posts.posts.map((post) => `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`);
+
 		res.send(`
 <h1> Hi ${req.ip}! </h1>
-
-<p> currently I lack any posts, but thanks for registering :D </p>
+	
+${post?post:'<p> currently I lack any posts, but thanks for registering :D </p>'}
 	
 	`);
 	} else
@@ -127,13 +129,14 @@ app.use('/blog/:num', (req, res) => {
 app.use('/blog', (req, res) => {
 	const ip = getIP(req);
 	if(allowed[ip]) {
+		let post = posts.posts.map((post) => `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`);
 
 		res.send(`
 <h1> Hi ${req.ip}! </h1>
 	
-${posts?posts.posts[0].body:'<p> currently I lack any posts ;-; </p>'}
+${post?post:'<p> currently I lack any posts ;-; </p>'}
 	
-	`);
+	`); 
 	} else
 		res.status(451).sendFile('./index.html', {root: './static'});
 });

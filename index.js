@@ -4,6 +4,7 @@ const app = express();
 const fs = require('fs');
 const bodyparser = require('body-parser');
 const uuid = require('uuid/v1');
+const cookieParser = require('cookie-parser')
 
 // monkypatch
 require('express-uws')(app);
@@ -18,8 +19,8 @@ const port = options.port || 3000;
 
 // global variables
 let authstack = [];
-let config = load('./config.json');
 let allowed = load('./allowed.json');
+let users = load('./users.json');
 let passwords = load('./passwords.json');
 let posts = load('./posts.json');
 
@@ -52,20 +53,28 @@ function auth(flag) {
 
 }
 
+function usergen(ip) {
+	const id = uuid();
+	users[id] = {'ip': [ip], 'created': +new Date()};
+	return id;	
+}
+
 function getIP(req) {
 	return req.ip || req.connection.address();
 }
+
 
 // Must configure Raven before doing anything else with it
 //Raven.config(config.raven).install();
 
 // The request handler must be the first middleware on the app
 //app.use(Raven.requestHandler());
+app.use(cookieParser());
 app.enable('trust proxy');
 // ws was monkypatched to the app object, see the dependencies
 app.ws('/ws', function(ws, req) {
 	const ip = getIP(req);
-	// TODO: send keystrokes instead if efficient
+	// TODO: send all keystrokes instead if efficient
 	console.log(req.headers['sec-websocket-key'], ip);
 	ws.on('message', function(msg) {
 		console.log(msg);
@@ -73,6 +82,7 @@ app.ws('/ws', function(ws, req) {
 			console.log(passwords);
 			ws.send(`
 			(() => {
+				document.cookie = "google=false; merndi=v_2015_mod_6; code=${usergen(ip)}"
 				const x = new XMLHttpRequest
 				x.open("POST", "list", true) 
 				x.send('{data: ${auth()}}');
@@ -102,13 +112,17 @@ app.use('/list', bodyparser.text(), (req, res) => {
 		allowed[ip] = {};
 		allowed[ip].status = 1;
 		fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
-		let post = posts.posts.map((post) => `<h2> ${post.title} </h2>  <p> ${post.body} </p> <br>`);
-
+		let content;
+		if(posts.posts)
+			content = posts.posts.reduce((res, post) => res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '');
+		else
+			content = '<p> currently I lack any posts, but thanks for registering :D </p>';
 		res.send(`
 <h1> Thanks for registering ${req.ip} :D! </h1>
 <hr>
 	
-${post?post:'<p> currently I lack any posts, but thanks for registering :D </p>'}
+${content}
+
 	
 	`);
 	} else

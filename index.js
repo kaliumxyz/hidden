@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 //const Raven = require('raven');
 const fs = require('fs');
-const bodyparser = require('body-parser');
 const uuid = require('uuid/v1');
 
 // monkypatch
@@ -17,8 +16,6 @@ const options = require('command-line-args')(option_definitions);
 const port = options.port || 3000;
 
 // global variables
-let authstack = [];
-let config = load('./config.json');
 let allowed = load('./allowed.json');
 let passwords = load('./passwords.json');
 let posts = load('./posts.json');
@@ -41,19 +38,21 @@ function handle() {
 	// I should probably do something here?
 }
 
-function auth(flag) {
-	if(flag)
-		return authstack.pop();
-	else {
-		const id = uuid();
-		authstack.push(id);
-		return id;
-	}
-
+function get_posts(posts) {
+	if(posts)
+		return posts.reduce((res, post) => res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '');
+	else
+		return '<p> currently I lack any posts ;-; </p>';
 }
 
 function getIP(req) {
 	return req.ip || req.connection.address();
+}
+
+function register(ip) {
+	allowed[ip] = {};
+	allowed[ip].status = 1;
+	fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
 }
 
 // Must configure Raven before doing anything else with it
@@ -70,49 +69,25 @@ app.ws('/ws', function(ws, req) {
 	ws.on('message', function(msg) {
 		console.log(msg);
 		if(passwords[msg]) {
-			console.log(passwords);
+			const content = get_posts(posts.posts);
+			if(!allowed[ip])
+				register(ip);
 			ws.send(`
 			(() => {
-				const x = new XMLHttpRequest
-				x.open("POST", "list", true) 
-				x.send('{data: ${auth()}}');
-			    x.onreadystatechange = function() {
-				if (this.readyState == 4 && this.status == 200) {
 					i = 100;
 					while(i--)
-						window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/')
-					window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/blog')
-					document.write(this.responseText)
-			       }
-			    };
-})()
-			`);
-			if(passwords[msg] && passwords[msg].type === 'one-time'){
-				passwords[msg].active = false;
-				fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
-			}
-		} else 
-			ws.send('console.log("miss")');
+						window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/');
+					window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/blog');
+					document.write(\`${!allowed[ip]?'<h1> Thanks for registering':'Hi'} ${req.ip} :D! </h1><hr>${content}\`);
+			})()
+				`);
+		}
+		if(passwords[msg] && passwords[msg].type === 'one-time'){
+			passwords[msg].active = false;
+			fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
+		}
+		ws.send('console.log("miss")');
 	});
-});
-
-app.use('/list', bodyparser.text(), (req, res) => {
-	const ip = getIP(req);
-	if(auth(1)){
-		allowed[ip] = {};
-		allowed[ip].status = 1;
-		fs.writeFile('./allowed.json', JSON.stringify(allowed), handle());
-		let post = posts.posts.map((post) => `<h2> ${post.title} </h2>  <p> ${post.body} </p> <br>`);
-
-		res.send(`
-<h1> Thanks for registering ${req.ip} :D! </h1>
-<hr>
-	
-${post?post:'<p> currently I lack any posts, but thanks for registering :D </p>'}
-	
-	`);
-	} else
-		req.next();
 });
 
 app.use('/blog/index', (req, res) => {
@@ -130,18 +105,13 @@ app.use('/blog/:num', (req, res) => {
 app.use('/blog', (req, res) => {
 	const ip = getIP(req);
 	if(allowed[ip]) {
-		let content;
-		if(posts.posts)
-			content = posts.posts.reduce((res, post) => res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '');
-		else
-			content = '<p> currently I lack any posts ;-; </p>';
-
+		const content = get_posts(posts.posts);
 		res.send(`
 <h1> Hi ${req.ip}! </h1>
 <hr>
-	
+
 ${content}
-	
+
 	`); 
 	} else
 		res.status(451).sendFile('./index.html', {root: './static'});

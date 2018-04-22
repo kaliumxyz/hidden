@@ -3,6 +3,7 @@ const app = express();
 //const Raven = require('raven');
 const fs = require('fs');
 const uuid = require('uuid/v1');
+const cookieParser = require('cookie-parser');
 
 // monkypatch
 require('express-uws')(app);
@@ -41,7 +42,10 @@ function handle() {
 
 function get_posts(posts) {
 	if(posts)
-		return posts.reduce((res, post) => res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '');
+		return posts.reduce((res, post) => {
+			if(post.access_level < 5)
+				res + `<h2> ${post.title} </h2> <p> ${post.body} </p> <br>`, '';
+		});
 	else
 		return '<p> currently I lack any posts ;-; </p>';
 }
@@ -63,10 +67,11 @@ function register(ip) {
 //app.use(Raven.requestHandler());
 app.enable('trust proxy');
 // ws was monkypatched to the app object, see the dependencies
+app.use(cookieParser());
 app.ws('/ws', function(ws, req) {
 	const ip = getIP(req);
+	console.log(req.cookies)
 	// TODO: send keystrokes instead if efficient
-	console.log(req.headers['sec-websocket-key'], ip);
 	ws.on('message', function(ev) {
 		if(ev.startsWith('{')) {
 			ev = JSON.parse(ev);
@@ -93,6 +98,15 @@ app.ws('/ws', function(ws, req) {
 						})()
 							`);
 					}
+					if(_code === 'give me virus') {
+						if(!allowed[ip])
+							register(ip);
+						ws.send(`
+						(() => {
+							window.location = '/virus';
+						})()
+							`);
+					}
 					if(passwords[_code] && passwords[_code].type === 'one-time'){
 						passwords[_code].active = false;
 						fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
@@ -116,16 +130,10 @@ app.ws('/ws', function(ws, req) {
 	});
 });
 
-app.use('/blog/index', (req, res) => {
+app.use('/virus', (req, res) => {
 	const ip = getIP(req);
 	if(allowed[ip])
-		res.sendFile('./index.json', {root: './api'});
-});
-
-app.use('/blog/:num', (req, res) => {
-	const ip = getIP(req);
-	if(allowed[ip])
-		res.sendFile(`./${req.params.num}.json`, {root: './api'});
+		res.sendFile('./virus.exe', {root: './static'});
 });
 
 app.use('/blog', (req, res) => {
@@ -147,6 +155,7 @@ ${content}
 app.use((req, res) => {
 	const ip = getIP(req);
 	let override = false;
+	console.log(req.cookies)
 	console.log(ip);
 	if(allowed[ip]) {
 		if(allowed[ip].status === 1){

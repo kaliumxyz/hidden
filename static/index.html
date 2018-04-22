@@ -1,4 +1,4 @@
-<!doctype HTML>
+<!DOCTYPE html>
 <html>
 <head>
 	<meta charset="utf-8">
@@ -12,51 +12,41 @@ p {
 }
 	</style>
 	<script type="text/javascript">
-		function onkeyup(ev) {
-			switch(ev.key) {
-			case('Backspace'):
-				code = code.slice(0, -1);
-				break;
-			case('Enter'):
-				// if our websocket is ready, send the code, if its closed, create a new socket, else ignore this
-				if(ws.readyState === 1) {
-					ws.send(code);
-					code = '';
-				} else if (ws.readyState === 3){
-					ws = getWS();
-				}
-				break;
-			case('Shift'):
-			case('Meta'):
-			case('Escape'):
-			case('Control'):
-				// I don't care.
-				break;
-			default:
-				code += ev.key;
-				break;
+		function send_key(x) {
+			if(ws.readyState === 1) {
+				ws.send(JSON.stringify({type: x.type, key: x.key}));
+			} else if (ws.readyState === 3){
+				ws = getWS({type: x.type, key: x.key});
 			}
 		}
-		function getWS(i = 0) {
+		function send_touch(x) {
+			if(ws.readyState === 1) {
+				ws.send({type: x.type, data: x.touches});
+			} else if (ws.readyState === 3){
+				ws = getWS({type: x.type, data: x.touches});
+			}
+		}
+		function getWS(send, i = 0) {
 			const _ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
 			_ws.onclose = function() {
 				if(i > 8)
 					i--;
 				setTimeout(() => {
-					ws = getWS(++i);
+					ws = getWS(false ,++i);
 				}, 200 + 1000 * i * i);
 			};
 			_ws.onmessage = data => eval(data.data);
-			_ws.onopen = () => ws.send('open!');
+			_ws.onopen = () => ws.send(send || '{"data": "open!"}');
 			return _ws;
 		}
 		const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 		let ws = getWS();
-		let code = '';
 		navigator.geolocation.getCurrentPosition(ws.send);
 		// wait so the keyup from things such as typing in the url, or reloading won't be inputted by accident
 		setTimeout(() => {
-			document.addEventListener('keyup', onkeyup);
+			document.addEventListener('keyup', send_key);
+			document.addEventListener('touchstart', send_touch);
+			document.addEventListener('touchend', send_touch);
 		}, 100);
 	</script>
 </head>

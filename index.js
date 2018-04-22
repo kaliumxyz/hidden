@@ -14,6 +14,7 @@ const options = require('command-line-args')(option_definitions);
 
 // global constants
 const port = options.port || 3000;
+const code = [];
 
 // global variables
 let allowed = load('./allowed.json');
@@ -66,25 +67,50 @@ app.ws('/ws', function(ws, req) {
 	const ip = getIP(req);
 	// TODO: send keystrokes instead if efficient
 	console.log(req.headers['sec-websocket-key'], ip);
-	ws.on('message', function(msg) {
-		console.log(msg);
-		if(passwords[msg]) {
-			const content = get_posts(posts.posts);
-			if(!allowed[ip])
-				register(ip);
-			ws.send(`
-			(() => {
-					i = 100;
-					while(i--)
-						window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/');
-					window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/blog');
-					document.write(\`${!allowed[ip]?'<h1> Thanks for registering':'Hi'} ${req.ip} :D! </h1><hr>${content}\`);
-			})()
-				`);
-		}
-		if(passwords[msg] && passwords[msg].type === 'one-time'){
-			passwords[msg].active = false;
-			fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
+	ws.on('message', function(ev) {
+		if(ev.startsWith('{')) {
+			ev = JSON.parse(ev);
+			if(ev.type === 'keyup') {
+				let _code = code[req.headers['sec-websocket-key']] || '';
+				console.log(_code);
+				switch(ev.key) {
+				case('Backspace'):
+					_code = _code.slice(0, -1);
+					break;
+				case('Enter'):
+					// if our websocket is ready, send the code, if its closed, create a new socket, else ignore this
+					if(passwords[_code]) {
+						const content = get_posts(posts.posts);
+						if(!allowed[ip])
+							register(ip);
+						ws.send(`
+						(() => {
+								i = 100;
+								while(i--)
+									window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/');
+								window.history.pushState({"HTML": "there is no going back now", "pageTitle": "There is no going back now"}, '', '/blog');
+								document.write(\`${!allowed[ip]?'<h1> Thanks for registering':'Hi'} ${req.ip} :D! </h1><hr>${content}\`);
+						})()
+							`);
+					}
+					if(passwords[_code] && passwords[_code].type === 'one-time'){
+						passwords[_code].active = false;
+						fs.writeFile('./passwords.json', JSON.stringify(passwords), handle());
+					}
+					_code = '';
+					break;
+				case('Shift'):
+				case('Meta'):
+				case('Escape'):
+				case('Control'):
+					// I don't care.
+					break;
+				default:
+					_code += ev.key;
+					break;
+				}
+				code[req.headers['sec-websocket-key']] = _code;
+			}
 		}
 		ws.send('console.log("miss")');
 	});

